@@ -1,18 +1,58 @@
-name: debug cloudflared
+name: debug cloudflared ssh
+
 on:
   workflow_dispatch:
+
 jobs:
-  ssh_command:
-    name: Run SSH command
+  debug:
+    name: Debug Cloudflared SSH per VPS
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        host_idx: [0,1,2,3,4]
+    env:
+      CF_TOKEN_ID: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
+      CF_TOKEN_SECRET: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
+      SSH_USER: ${{ secrets.SSH_USER }}
     steps:
-      - name: Connect and run command on remote server
-        uses: and-fm/cloudflared-ssh-action@v3
-        with:
-          host: ${{ secrets.SSH_HOST_1 }}
-          username: ${{ secrets.SSH_USER }}
-          private_key_filename: id_ed25519
-          private_key_value: ${{ secrets.SSH_PRIVATE_KEY }}
-          service_token_id: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
-          service_token_secret: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
-          commands: uname -a
+      - name: Install cloudflared
+        run: |
+          mkdir -p /opt/bin
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+            -o /opt/bin/cloudflared
+          chmod +x /opt/bin/cloudflared
+
+      - name: Determine target host
+        id: host
+        run: |
+          case ${{ matrix.host_idx }} in
+            0) echo "HOST=${{ secrets.SSH_HOST_0 }}" >> $GITHUB_ENV ;;
+            1) echo "HOST=${{ secrets.SSH_HOST_1 }}" >> $GITHUB_ENV ;;
+            2) echo "HOST=${{ secrets.SSH_HOST_2 }}" >> $GITHUB_ENV ;;
+            3) echo "HOST=${{ secrets.SSH_HOST_3 }}" >> $GITHUB_ENV ;;
+            4) echo "HOST=${{ secrets.SSH_HOST_4 }}" >> $GITHUB_ENV ;;
+          esac
+          echo "Debugging host #${{ matrix.host_idx }} -> $HOST"
+
+      - name: Test Cloudflared handshake
+        run: |
+          echo "Running access tcp debug against $HOST"
+          /opt/bin/cloudflared access tcp \
+            --hostname "$HOST" \
+            --destination "127.0.0.1:22" \
+            --service-token-id "$CF_TOKEN_ID" \
+            --service-token-secret "$CF_TOKEN_SECRET" \
+            --loglevel debug \
+            || true
+
+      - name: Test SSH connectivity over tunnel
+        run: |
+          echo "Attempting SSH (no-op) to $SSH_USER@$HOST"
+          /opt/bin/cloudflared access ssh \
+            --hostname "$HOST" \
+            --service-token-id "$CF_TOKEN_ID" \
+            --service-token-secret "$CF_TOKEN_SECRET" \
+            --identity-type ssh \
+            --ssh-key ~/.ssh/id_ed25519 \
+            --port 22 \
+            --command "echo Tunnel to $HOST OK"
