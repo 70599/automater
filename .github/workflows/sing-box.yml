@@ -3,6 +3,7 @@ name: auto-deploy sing-box via cloudflared
 on:
   schedule:
     - cron: '0 */4 * * *'  # every 4 hours
+  workflow_dispatch:
 
 jobs:
   poll:
@@ -11,7 +12,11 @@ jobs:
     outputs:
       tag: ${{ steps.get.outputs.tag }}
       prerelease: ${{ steps.get.outputs.pr }}
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Get latest release info
         id: get
         run: |
@@ -27,10 +32,23 @@ jobs:
           echo "Latest release (${{ steps.get.outputs.tag }}) is not a prerelease. Exiting."
           exit 0
 
+      - name: Check last deployed tag
+        id: check
+        run: |
+          DEPLOYED_FILE=sing-box/last_deployed_tag
+          if [ -f "$DEPLOYED_FILE" ]; then
+            last=$(cat "$DEPLOYED_FILE")
+          else
+            last=""
+          fi
+          echo "Last deployed: $last"
+          should=$([ "$last" != "${{ steps.get.outputs.tag }}" ] && echo true || echo false)
+          echo "::set-output name=should_deploy::$should"
+
   build:
     name: Build sing-box binaries
     needs: poll
-    if: needs.poll.outputs.prerelease == 'true'
+    if: needs.poll.outputs.prerelease == 'true' && needs.poll.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -57,17 +75,10 @@ jobs:
           ref: ${{ needs.poll.outputs.tag }}
           fetch-depth: 0
 
-      - name: Get Go version
-        id: version
-        run: |
-          echo go_version=$(curl -s https://raw.githubusercontent.com/actions/go-versions/main/versions-manifest.json \
-            | grep -oE '"version": "[0-9]+\.[0-9]+(\.[0-9]+)?"' \
-            | head -1 | cut -d':' -f2 | tr -d ' "') >> $GITHUB_OUTPUT
-
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ steps.version.outputs.go_version }}
+          go-version: '1.x'
 
       - name: Build ${{ matrix.name }}
         env:
@@ -79,7 +90,7 @@ jobs:
         run: make
 
       - name: Compress ${{ matrix.name }}
-        run: upx sing-box
+        run: upx --best --lzma sing-box
 
       - name: Upload ${{ matrix.name }}
         uses: actions/upload-artifact@v3
@@ -90,7 +101,7 @@ jobs:
   deploy:
     name: Deploy to VPS via cloudflared
     needs: build
-    if: needs.poll.outputs.prerelease == 'true'
+    if: needs.poll.outputs.prerelease == 'true' && needs.poll.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -102,25 +113,17 @@ jobs:
       PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_AU }}
       PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
     steps:
-      - name: Download amd64 artifact
-        if: ${{ matrix.host_idx != 0 }}
+      - name: Download artifact for host ${{ matrix.host_idx }}
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.host_idx == 1 && 'sing-box-linux-amd64-v3' || 'sing-box-linux-amd64' }}
-          path: ./deploy
-
-      - name: Download arm64 artifact
-        if: ${{ matrix.host_idx == 0 }}
-        uses: actions/download-artifact@v3
-        with:
-          name: sing-box-linux-arm64
+          name: ${{ matrix.host_idx == 0 && 'sing-box-linux-arm64' || matrix.host_idx == 1 && 'sing-box-linux-amd64-v3' || 'sing-box-linux-amd64' }}
           path: ./deploy
 
       - name: Prepare SSH config
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}"   > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
           cat <<EOF > ~/.ssh/config
           Host vps
@@ -149,10 +152,20 @@ jobs:
               curl -s \
                 --form-string "token=$PUSHOVER_TOKEN" \
                 --form-string "user=$PUSHOVER_USER" \
-                --form-string "title=$(hostname) 上的 sing-box 部署失败" \
+                --form-string "title=Deploy failed on $(hostname)" \
                 --form-string "html=1" \
-                --form-string "message=<b>sing-box 部署失败</b><br>主机: $(hostname)" \
+                --form-string "message=<b>sing-box update failed</b><br>Host: $(hostname)" \
                 https://api.pushover.net/1/messages.json
               exit 1
             fi
           EOF
+
+      - name: Record deployed tag
+        if: success()
+        run: |
+          echo "${{ needs.poll.outputs.tag }}" > sing-box/last_deployed_tag
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sing-box/last_deployed_tag
+          git commit -m "Record deployed tag ${{ needs.poll.outputs.tag }}"
+          git push
