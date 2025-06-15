@@ -1,8 +1,8 @@
 name: auto-deploy sing-box via cloudflared
 
 on:
-  schedule:
-    - cron: '0 */4 * * *'  # every 4 hours
+  # schedule:
+  #   - cron: '0 */4 * * *'  # every 4 hours
   workflow_dispatch:
 
 jobs:
@@ -72,6 +72,8 @@ jobs:
             goos: linux
             goarch: arm64
             artifact: sing-box-linux-arm64
+    env:
+      TAG: ${{ needs.poll.outputs.tag }}
     steps:
       - name: Checkout sing-box @ ${{ needs.poll.outputs.tag }}
         uses: actions/checkout@v4
@@ -174,28 +176,22 @@ jobs:
         run: |
           ssh vps bash -e <<'EOF'
             [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
-            if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
-              mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
-              mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
-              screen -dmS singbox-restart service sing-box restart
-            else
-              curl -s \
-                --form-string "token=$PUSHOVER_TOKEN" \
-                --form-string "user=$PUSHOVER_USER" \
-                --form-string "title=Deploy failed on $(hostname)" \
-                --form-string "html=1" \
-                --form-string "message=<b>sing-box update failed</b><br>Host: $(hostname)" \
-                https://api.pushover.net/1/messages.json
-              exit 1
-            fi
+            /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json || curl -s \
+              --form-string "token=$PUSHOVER_TOKEN" \
+              --form-string "user=$PUSHOVER_USER" \
+              --form-string "title=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
+              --form-string "html=1" \
+              --form-string "message=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
+              https://api.pushover.net/1/messages.json
+            exit 1
           EOF
 
       - name: Record deployed tag
         if: success()
         run: |
-          echo "${{ needs.poll.outputs.tag }}" > sing-box/last_deployed_tag
+          echo "$TAG" > sing-box/last_deployed_tag
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add sing-box/last_deployed_tag
-          git commit -m "Record deployed tag ${{ needs.poll.outputs.tag }}"
+          git commit -m "Record deployed tag $TAG"
           git push
