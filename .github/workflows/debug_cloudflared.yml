@@ -53,6 +53,5 @@ jobs:
 
       - name: Get file from VPS
         run: |
-          rsync -avz vps:/tmp/sign ./
           ssh -v vps "cat /tmp/sign"
           
