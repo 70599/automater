@@ -44,7 +44,7 @@ jobs:
           Host vps
             HostName $HOST
             User $SSH_USER
-            ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id $CF_TOKEN_ID --service-token-secret $CF_TOKEN_SECRET --loglevel debug
+            ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id $CF_TOKEN_ID --service-token-secret $CF_TOKEN_SECRET --loglevel debug --logfile ~/cloudflared.log
           EOF
           chmod 600 ~/.ssh/config
 
@@ -52,4 +52,5 @@ jobs:
         run: |
           /opt/bin/cloudflared version
           ssh -v vps "cat /tmp/sign"
+          cat ~/cloudflared.log
           
