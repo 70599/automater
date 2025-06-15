@@ -108,14 +108,14 @@ jobs:
           commands: |
             set -e
             # backup current binary
-            cp /opt/sing-box/sing-box /opt/sing-box/sing-box_bkup || true
+            cp -f /opt/sing-box/sing-box /opt/sing-box/sing-box_bkup || true
             # replace with new
-            mv /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+            mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
             # check compatibility
             if /opt/sing-box/sing-box check -c /opt/sing-box/config.json; then
               service sing-box restart
             else
-              mv /opt/sing-box/sing-box_bkup /opt/sing-box/sing-box
+              mv -f /opt/sing-box/sing-box_bkup /opt/sing-box/sing-box
               curl -s \
                 --form-string "token=${{ secrets.PUSHOVER_APP_AU }}" \
                 --form-string "user=${{ secrets.PUSHOVER_USER }}" \
