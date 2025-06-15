@@ -173,8 +173,9 @@ jobs:
       - name: Post-deploy check & finalize
         run: |
           ssh vps bash -e <<'EOF'
-            cp /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup || true
-            mv /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+            cp -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup || true
+            mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+            [ -x /opt/sing-box/sing-box ] || chmod +x /opt/sing-box/sing-box
             if /opt/sing-box/sing-box check -c /opt/sing-box/config.json; then
               service sing-box restart
             else
