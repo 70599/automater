@@ -7,11 +7,10 @@ on:
 
 jobs:
   poll:
-    name: Poll latest sing-box prerelease
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.get.outputs.tag }}
-      prerelease: ${{ steps.get.outputs.pr }}
+      pr:  ${{ steps.get.outputs.pr }}
       should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
       - name: Checkout repo
@@ -22,28 +21,28 @@ jobs:
         run: |
           info=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases?per_page=1)
           tag=$(echo "$info" | jq -r '.[0].tag_name')
-          pr=$(echo "$info" | jq -r '.[0].prerelease')
-          echo "::set-output name=tag::$tag"
-          echo "::set-output name=pr::$pr"
+          pr=$(echo "$info"  | jq -r '.[0].prerelease')
+
+          # 改为写入 $GITHUB_OUTPUT
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+          echo "pr=$pr"   >> $GITHUB_OUTPUT
 
       - name: Stop if not prerelease
         if: ${{ steps.get.outputs.pr != 'true' }}
-        run: |
-          echo "Latest release (${{ steps.get.outputs.tag }}) is not a prerelease. Exiting."
-          exit 0
+        run: exit 0
 
       - name: Check last deployed tag
         id: check
         run: |
           DEPLOYED_FILE=sing-box/last_deployed_tag
-          if [ -f "$DEPLOYED_FILE" ]; then
-            last=$(cat "$DEPLOYED_FILE")
-          else
-            last=""
-          fi
-          echo "Last deployed: $last"
-          should=$([ "$last" != "${{ steps.get.outputs.tag }}" ] && echo true || echo false)
-          echo "::set-output name=should_deploy::$should"
+          last=""
+          [ -f "$DEPLOYED_FILE" ] && last=$(cat "$DEPLOYED_FILE")
+
+          should="false"
+          [ "$last" != "${{ steps.get.outputs.tag }}" ] && should="true"
+
+          # 同样写入 $GITHUB_OUTPUT
+          echo "should_deploy=$should" >> $GITHUB_OUTPUT
 
   build:
     name: Build sing-box binaries
@@ -100,7 +99,7 @@ jobs:
         run: upx sing-box
 
       - name: Upload ${{ matrix.name }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: sing-box
