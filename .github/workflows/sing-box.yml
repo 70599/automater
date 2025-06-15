@@ -173,7 +173,7 @@ jobs:
       - name: Post-deploy check & finalize
         run: |
           ssh vps bash -e <<'EOF'
-            [ -x /opt/sing-box/sing-box ] || chmod +x /opt/sing-box/sing-box
+            [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
             if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
               mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
               mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
