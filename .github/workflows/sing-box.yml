@@ -138,6 +138,12 @@ jobs:
                   || 'sing-box-linux-amd64' }}
           path: ./deploy
 
+      - name: Install cloudflared
+        run: |
+          mkdir -p /opt/bin
+          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /opt/bin/cloudflared
+          chmod +x /opt/bin/cloudflared
+
       - name: Prepare SSH config
         run: |
           mkdir -p ~/.ssh
