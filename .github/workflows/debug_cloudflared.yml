@@ -34,25 +34,25 @@ jobs:
           esac
           echo "Debugging host #${{ matrix.host_idx }} -> $HOST"
 
-      - name: Test Cloudflared handshake
+      - name: Prepare SSH config
         run: |
-          echo "Running access tcp debug against $HOST"
-          /opt/bin/cloudflared access tcp \
-            --hostname "$HOST" \
-            --destination "127.0.0.1:22" \
-            --service-token-id "$CF_TOKEN_ID" \
-            --service-token-secret "$CF_TOKEN_SECRET" \
-            --loglevel debug \
-            || true
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}"   > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          cat <<EOF > ~/.ssh/config
+          Host vps
+            HostName $HOST
+            User $SSH_USER
+            ProxyCommand /opt/bin/cloudflared access ssh \
+              --hostname %h \
+              --service-token-id $CF_TOKEN_ID \
+              --service-token-secret $CF_TOKEN_SECRET
+          EOF
+          chmod 600 ~/.ssh/config
 
-      - name: Test SSH connectivity over tunnel
+      - name: Get file from VPS
         run: |
-          echo "Attempting SSH (no-op) to $SSH_USER@$HOST"
-          /opt/bin/cloudflared access ssh \
-            --hostname "$HOST" \
-            --service-token-id "$CF_TOKEN_ID" \
-            --service-token-secret "$CF_TOKEN_SECRET" \
-            --identity-type ssh \
-            --ssh-key ~/.ssh/id_ed25519 \
-            --port 22 \
-            --command "echo Tunnel to $HOST OK"
+          rsync -avz vps:/tmp/sign ./
+          ssh -v vps "cat /tmp/sign"
+          
