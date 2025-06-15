@@ -97,7 +97,7 @@ jobs:
         run: make
 
       - name: Compress ${{ matrix.name }}
-        run: upx --best --lzma sing-box
+        run: upx sing-box
 
       - name: Upload ${{ matrix.name }}
         uses: actions/upload-artifact@v3
@@ -106,7 +106,6 @@ jobs:
           path: sing-box
 
   deploy:
-    name: Deploy to VPS via cloudflared
     needs: build
     if: needs.poll.outputs.prerelease == 'true' && needs.poll.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
@@ -119,11 +118,19 @@ jobs:
       CF_TOKEN_SECRET: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
       PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_AU }}
       PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
+      # 通过条件表达式，从对应的 secret 中选出当前主机的地址
+      HOST: ${{ matrix.host_idx == 0 && secrets.SSH_HOST_0
+               || matrix.host_idx == 1 && secrets.SSH_HOST_1
+               || matrix.host_idx == 2 && secrets.SSH_HOST_2
+               || matrix.host_idx == 3 && secrets.SSH_HOST_3
+               || secrets.SSH_HOST_4 }}
     steps:
       - name: Download artifact for host ${{ matrix.host_idx }}
         uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.host_idx == 0 && 'sing-box-linux-arm64' || matrix.host_idx == 1 && 'sing-box-linux-amd64-v3' || 'sing-box-linux-amd64' }}
+          name: ${{ matrix.host_idx == 0 && 'sing-box-linux-arm64'
+                  || matrix.host_idx == 1 && 'sing-box-linux-amd64-v3'
+                  || 'sing-box-linux-amd64' }}
           path: ./deploy
 
       - name: Prepare SSH config
@@ -134,7 +141,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
           cat <<EOF > ~/.ssh/config
           Host vps
-            HostName ${{ secrets['SSH_HOST_' + matrix.host_idx] }}
+            HostName $HOST
             User $SSH_USER
             ProxyCommand /opt/bin/cloudflared access ssh \
               --hostname %h \
