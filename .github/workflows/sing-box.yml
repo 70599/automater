@@ -138,63 +138,30 @@ jobs:
                   || 'sing-box-linux-amd64' }}
           path: ./deploy
 
-      - name: Install cloudflared
-        run: |
-          mkdir -p /opt/bin
-          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /opt/bin/cloudflared
-          chmod +x /opt/bin/cloudflared
-
-      - name: Prepare SSH config
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY }}"   > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-          cat <<EOF > ~/.ssh/config
-          Host vps
-            HostName $HOST
-            User $SSH_USER
-            ProxyCommand /opt/bin/cloudflared access ssh \
-              --hostname %h \
-              --service-token-id $CF_TOKEN_ID \
-              --service-token-secret $CF_TOKEN_SECRET
-          EOF
-          chmod 600 ~/.ssh/config
-
-      - name: Test cloudflared SSH handshake
-        run: |
-          set -x
-          /opt/bin/cloudflared access ssh \
-            --hostname $HOST \
-            --service-token-id $CF_TOKEN_ID \
-            --service-token-secret $CF_TOKEN_SECRET \
-            --loglevel debug \
-            --timeout 30s \
-            echo "handshake ok"
-
-      - name: Rsync binary
-        run: |
-          rsync -az --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
-
-      - name: Post-deploy check & finalize
-        run: |
-          ssh vps bash -e <<'EOF'
-            cp /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup || true
-            mv /opt/sing-box/sing-box.new /opt/sing-box/sing-box
-            if /opt/sing-box/sing-box check -c /opt/sing-box/config.json; then
-              service sing-box restart
-            else
-              mv /opt/sing-box/sing-box.bkup /opt/sing-box/sing-box
-              curl -s \
-                --form-string "token=$PUSHOVER_TOKEN" \
-                --form-string "user=$PUSHOVER_USER" \
-                --form-string "title=Deploy failed on $(hostname)" \
-                --form-string "html=1" \
-                --form-string "message=<b>sing-box update failed</b><br>Host: $(hostname)" \
-                https://api.pushover.net/1/messages.json
-              exit 1
-            fi
-          EOF
+      - name: Deploy via cloudflared SSH Action
+        uses: and-fm/cloudflared-ssh-action@v3
+        with:
+          host: ${{ env.HOST }}
+          username: ${{ env.SSH_USER }}
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          service_token_id: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
+          service_token_secret: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
+          commands: |
+            rsync -az --delete ./deploy/sing-box ${SSH_USER}@${HOST}:/opt/sing-box/sing-box.new
+            ssh ${SSH_USER}@${HOST} "bash -e <<'EOF'
+              cp /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
+              mv /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+              if /opt/sing-box/sing-box check -c /opt/sing-box/config.json; then
+                service sing-box restart
+              else
+                mv /opt/sing-box/sing-box.bkup /opt/sing-box/sing-box
+                curl -s --form-string "token=$PUSHOVER_TOKEN" --form-string "user=$PUSHOVER_USER" \
+                  --form-string "title=Deploy failed on $(hostname)" --form-string "html=1" \
+                  --form-string "message=<b>sing-box update failed</b><br>Host: $(hostname)" \
+                  https://api.pushover.net/1/messages.json
+                exit 1
+              fi
+            EOF"
 
       - name: Record deployed tag
         if: success()
