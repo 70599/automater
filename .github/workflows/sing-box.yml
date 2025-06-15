@@ -7,42 +7,48 @@ on:
 
 jobs:
   poll:
+    name: Poll latest sing-box prerelease
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.get.outputs.tag }}
-      pr:  ${{ steps.get.outputs.pr }}
+      prerelease: ${{ steps.get.outputs.pr }}
       should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Get latest release info
+      - name: Get latest prerelease info
         id: get
         run: |
-          info=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases?per_page=1)
-          tag=$(echo "$info" | jq -r '.[0].tag_name')
-          pr=$(echo "$info"  | jq -r '.[0].prerelease')
+          # 拉取所有 release，再挑出 prerelease
+          info=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases)
+          tag=$(echo "$info" \
+            | jq -r '[.[] | select(.prerelease == true)][0].tag_name')
+          pr=$(echo "$info" \
+            | jq -r '[.[] | select(.prerelease == true)][0].prerelease')
 
-          # 改为写入 $GITHUB_OUTPUT
+          if [ -z "$tag" ] || [ "$pr" != "true" ]; then
+            echo "No prerelease found, or API error. Exiting."
+            exit 0
+          fi
+
+          # 写输出
           echo "tag=$tag" >> $GITHUB_OUTPUT
           echo "pr=$pr"   >> $GITHUB_OUTPUT
-
-      - name: Stop if not prerelease
-        if: ${{ steps.get.outputs.pr != 'true' }}
-        run: exit 0
 
       - name: Check last deployed tag
         id: check
         run: |
           DEPLOYED_FILE=sing-box/last_deployed_tag
           last=""
-          [ -f "$DEPLOYED_FILE" ] && last=$(cat "$DEPLOYED_FILE")
+          [ -f "$DEPLOYED_FILE" ] && last=$(<"$DEPLOYED_FILE")
 
-          should="false"
-          [ "$last" != "${{ steps.get.outputs.tag }}" ] && should="true"
-
-          # 同样写入 $GITHUB_OUTPUT
-          echo "should_deploy=$should" >> $GITHUB_OUTPUT
+          echo "Last deployed: $last"
+          if [ "$last" != "${{ steps.get.outputs.tag }}" ]; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
 
   build:
     name: Build sing-box binaries
