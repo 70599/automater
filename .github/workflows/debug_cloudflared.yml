@@ -50,5 +50,6 @@ jobs:
 
       - name: Get file from VPS
         run: |
+          /opt/bin/cloudflared version
           ssh -v vps "cat /tmp/sign"
           
