@@ -185,7 +185,6 @@ jobs:
               --form-string "html=1" \
               --form-string "message=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
               https://api.pushover.net/1/messages.json
-            exit 1
           EOF
 
       - name: Record deployed tag
