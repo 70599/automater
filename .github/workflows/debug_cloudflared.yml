@@ -44,10 +44,7 @@ jobs:
           Host vps
             HostName $HOST
             User $SSH_USER
-            ProxyCommand /opt/bin/cloudflared access ssh \
-              --hostname %h \
-              --service-token-id $CF_TOKEN_ID \
-              --service-token-secret $CF_TOKEN_SECRET
+            ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id $CF_TOKEN_ID --service-token-secret $CF_TOKEN_SECRET
           EOF
           chmod 600 ~/.ssh/config
 
