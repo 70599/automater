@@ -161,6 +161,17 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
+      - name: Test cloudflared SSH handshake
+        run: |
+          set -x
+          /opt/bin/cloudflared access ssh \
+            --hostname $HOST \
+            --service-token-id $CF_TOKEN_ID \
+            --service-token-secret $CF_TOKEN_SECRET \
+            --loglevel debug \
+            --timeout 30s \
+            echo "handshake ok"
+
       - name: Rsync binary
         run: |
           rsync -az --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
