@@ -1,0 +1,127 @@
+name: deploy sing-box via cloudflared
+
+on:
+  release:
+    types: [prereleased]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      linux-amd64-artifact: ${{ steps.upload_amd64.outputs.artifact-path }}
+      linux-amd64-v3-artifact: ${{ steps.upload_amd64v3.outputs.artifact-path }}
+      linux-arm64-artifact: ${{ steps.upload_arm64.outputs.artifact-path }}
+    steps:
+      - name: Checkout sing-box
+        uses: actions/checkout@v3
+        with:
+          repository: SagerNet/sing-box
+          fetch-depth: 0
+
+      - name: Get Go version
+        id: version
+        run: |
+          echo go_version=$(curl -s https://raw.githubusercontent.com/actions/go-versions/main/versions-manifest.json \
+            | grep -oE '"version": "[0-9]+\.[0-9]+(\.[0-9]+)?"' \
+            | head -1 | cut -d':' -f2 | tr -d ' "') >> $GITHUB_OUTPUT
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ steps.version.outputs.go_version }}
+
+      - name: Build linux-amd64
+        run: |
+          GOOS=linux GOARCH=amd64 GOAMD64=v1 CGO_ENABLED=0 TAGS="with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api" make
+      - name: Compress amd64
+        run: upx sing-box
+      - name: Upload amd64
+        id: upload_amd64
+        uses: actions/upload-artifact@v3
+        with:
+          name: sing-box-linux-amd64
+          path: sing-box
+
+      - name: Build linux-amd64-v3
+        run: |
+          GOOS=linux GOARCH=amd64 GOAMD64=v3 CGO_ENABLED=0 TAGS="with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api" make
+      - name: Compress amd64v3
+        run: upx sing-box
+      - name: Upload amd64v3
+        id: upload_amd64v3
+        uses: actions/upload-artifact@v3
+        with:
+          name: sing-box-linux-amd64-v3
+          path: sing-box
+
+      - name: Build linux-arm64
+        run: |
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 TAGS="with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api" make
+      - name: Compress arm64
+        run: upx sing-box
+      - name: Upload arm64
+        id: upload_arm64
+        uses: actions/upload-artifact@v3
+        with:
+          name: sing-box-linux-arm64
+          path: sing-box
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        host_idx: [0,1,2,3,4]
+    steps:
+      - name: Download appropriate artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ matrix.host_idx == 0 && 'sing-box-linux-arm64' || matrix.host_idx == 1 && 'sing-box-linux-amd64-v3' || 'sing-box-linux-amd64' }}
+          path: ./deploy
+
+      - name: Setup SSH + cloudflared
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          cat <<EOF > ~/.ssh/config
+          Host ${!SECRET_SSH_HOST_${{ matrix.host_idx }}}
+            User ${{ secrets.SSH_USER }}
+            ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id ${{ secrets.CLOUDFLARED_TOKEN_ID }} --service-token-secret ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Rsync binary to VPS
+        run: |
+          rsync -az --delete ./deploy/sing-box "${{ secrets.SSH_USER }}@${{ secrets['SSH_HOST_' + matrix.host_idx] }}:/opt/sing-box/sing-box.new"
+
+      - name: Post-deploy check & finalize
+        uses: and-fm/cloudflared-ssh-action@v3
+        with:
+          host: ${{ secrets['SSH_HOST_' + matrix.host_idx] }}
+          username: ${{ secrets.SSH_USER }}
+          private_key_filename: id_ed25519
+          private_key_value: ${{ secrets.SSH_PRIVATE_KEY }}
+          service_token_id: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
+          service_token_secret: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
+          commands: |
+            set -e
+            # backup current binary
+            cp /opt/sing-box/sing-box /opt/sing-box/sing-box_bkup || true
+            # replace with new
+            mv /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+            # check compatibility
+            if /opt/sing-box/sing-box check -c /opt/sing-box/config.json; then
+              service sing-box restart
+            else
+              mv /opt/sing-box/sing-box_bkup /opt/sing-box/sing-box
+              curl -s \
+                --form-string "token=${{ secrets.PUSHOVER_APP_AU }}" \
+                --form-string "user=${{ secrets.PUSHOVER_USER }}" \
+                --form-string "title=$(hostname) 上的 sing-box 部署失败" \
+                --form-string "html=1" \
+                --form-string "message=<b>sing-box 部署失败</b><br>主机: $(hostname)" \
+                https://api.pushover.net/1/messages.json
+              exit 1
+            fi
