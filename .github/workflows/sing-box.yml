@@ -142,23 +142,27 @@ jobs:
         uses: and-fm/cloudflared-ssh-action@v3
         with:
           host: ${{ env.HOST }}
-          username: ${{ env.SSH_USER }}
+          port: 22                         # 一定要加上，不然默认不会转发 SSH
+          username: ${{ secrets.SSH_USER }}
           private_key_filename: id_ed25519
           private_key_value: ${{ secrets.SSH_PRIVATE_KEY }}
-          service_token_id: ${{ env.CF_TOKEN_ID }}
-          service_token_secret: ${{ env.CF_TOKEN_SECRET }}
+          service_token_id: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
+          service_token_secret: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
           commands: |
-            rsync -az --delete ./deploy/sing-box ${SSH_USER}@${HOST}:/opt/sing-box/sing-box.new
-            ssh ${SSH_USER}@${HOST} "bash -e <<'EOF'
-              cp /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
+            rsync -az --delete ./deploy/sing-box ${{ secrets.SSH_USER }}@${{ env.HOST }}:/opt/sing-box/sing-box.new
+            ssh ${{ secrets.SSH_USER }}@${{ env.HOST }} "bash -e <<'EOF'
+              cp /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup || true
               mv /opt/sing-box/sing-box.new /opt/sing-box/sing-box
               if /opt/sing-box/sing-box check -c /opt/sing-box/config.json; then
                 service sing-box restart
               else
                 mv /opt/sing-box/sing-box.bkup /opt/sing-box/sing-box
-                curl -s --form-string "token=$PUSHOVER_TOKEN" --form-string "user=$PUSHOVER_USER" \
-                  --form-string "title=Deploy failed on $(hostname)" --form-string "html=1" \
-                  --form-string "message=<b>sing-box update failed</b><br>Host: $(hostname)" \
+                curl -s \
+                  --form-string \"token=${{ secrets.PUSHOVER_APP_AU }}\" \
+                  --form-string \"user=${{ secrets.PUSHOVER_USER }}\" \
+                  --form-string \"title=Deploy failed on \\$(hostname)\" \
+                  --form-string \"html=1\" \
+                  --form-string \"message=<b>sing-box update failed</b><br>Host: \\$(hostname)\" \
                   https://api.pushover.net/1/messages.json
                 exit 1
               fi
