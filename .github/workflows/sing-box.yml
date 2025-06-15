@@ -147,7 +147,6 @@ jobs:
           private_key_value: ${{ secrets.SSH_PRIVATE_KEY }}
           service_token_id: ${{ env.CF_TOKEN_ID }}
           service_token_secret: ${{ env.CF_TOKEN_SECRET }}
-          debug: true
           commands: |
             rsync -az --delete ./deploy/sing-box ${SSH_USER}@${HOST}:/opt/sing-box/sing-box.new
             ssh ${SSH_USER}@${HOST} "bash -e <<'EOF'
