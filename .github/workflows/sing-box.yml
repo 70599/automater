@@ -118,7 +118,6 @@ jobs:
       matrix:
         host_idx: [0,1,2,3,4]
     env:
-      TAG: ${{ needs.poll.outputs.tag }}
       SSH_USER: ${{ secrets.SSH_USER }}
       CF_TOKEN_ID: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
       CF_TOKEN_SECRET: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
@@ -131,9 +130,6 @@ jobs:
                || matrix.host_idx == 3 && secrets.SSH_HOST_3
                || secrets.SSH_HOST_4 }}
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
       - name: Download artifact for host ${{ matrix.host_idx }}
         uses: actions/download-artifact@v4
         with:
@@ -198,8 +194,16 @@ jobs:
             fi
           EOF
 
+  record:
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.poll.outputs.tag }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Record deployed tag
-        if: success()
         run: |
           pwd
           ls -l `pwd`
