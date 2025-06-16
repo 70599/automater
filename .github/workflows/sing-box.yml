@@ -170,11 +170,11 @@ jobs:
           cf_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           cf_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: Rsync binary
+      - name: scp binary
         run: |
           RC=1 
           while [[ $RC -ne 0 ]]; do
-            rsync -avz --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
+            scp ./deploy/sing-box vps:/opt/sing-box/sing-box.new
             RC=$?
           done
 
