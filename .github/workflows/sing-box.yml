@@ -201,6 +201,8 @@ jobs:
       - name: Record deployed tag
         if: success()
         run: |
+          pwd
+          ls -l `pwd`
           if [ -z "$TAG" ]; then
             echo "TAG 变量为空"
           else 
