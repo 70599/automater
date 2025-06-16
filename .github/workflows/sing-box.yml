@@ -172,19 +172,30 @@ jobs:
 
       - name: Rsync binary
         run: |
-          rsync -avz --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
+          RC=1 
+          while [[ $RC -ne 0 ]]; do
+            rsync -avz --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
+            RC=$?
+          done
 
       - name: Post-deploy check & finalize
         run: |
           ssh vps bash -e <<'EOF'
             [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
-            /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json || curl -s \
-              --form-string "token=$PUSHOVER_TOKEN" \
-              --form-string "user=$PUSHOVER_USER" \
-              --form-string "title=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
-              --form-string "html=1" \
-              --form-string "message=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
-              https://api.pushover.net/1/messages.json
+            if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
+              mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
+              mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+              touch /opt/sing-box/_upgrade
+            else
+              rm -rf /opt/sing-box/sing-box.new
+              curl -s \
+                --form-string "token=$PUSHOVER_TOKEN" \
+                --form-string "user=$PUSHOVER_USER" \
+                --form-string "title=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
+                --form-string "html=1" \
+                --form-string "message=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
+                https://api.pushover.net/1/messages.json
+            fi
           EOF
 
       - name: Record deployed tag
