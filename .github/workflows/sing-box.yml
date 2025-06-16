@@ -205,6 +205,7 @@ jobs:
 
       - name: Record deployed tag
         run: |
+          echo $GITHUB_OUTPUT
           pwd
           ls -l `pwd`
           tree
