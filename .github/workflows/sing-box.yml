@@ -185,7 +185,7 @@ jobs:
             if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
               mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
               mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
-              touch /opt/sing-box/_upgrade
+              [ -e /opt/sing-box/_upgrade ] || touch /opt/sing-box/_upgrade
             else
               rm -rf /opt/sing-box/sing-box.new
               curl -s \
@@ -203,6 +203,7 @@ jobs:
         run: |
           pwd
           ls -l `pwd`
+          tree
           if [ -z "$TAG" ]; then
             echo "TAG 变量为空"
           else 
