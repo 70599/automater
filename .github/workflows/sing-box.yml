@@ -1,10 +1,10 @@
 name: auto-deploy sing-box via cloudflared
-permissions:
-  contents: write
+# permissions:
+#   contents: write
 
 on:
-  # schedule:
-  #   - cron: '0 */4 * * *'  # every 4 hours
+  schedule:
+    - cron: '0 */4 * * *'  # every 4 hours
   workflow_dispatch:
 
 jobs:
