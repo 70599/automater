@@ -111,7 +111,7 @@ jobs:
           path: sing-box
 
   deploy:
-    needs: build
+    needs: [poll, build]
     if: needs.poll.outputs.prerelease == 'true' && needs.poll.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -196,7 +196,7 @@ jobs:
           EOF
 
   record:
-    needs: deploy
+    needs: [poll, deploy]
     runs-on: ubuntu-latest
     env:
       TAG: ${{ needs.poll.outputs.tag }}
@@ -206,11 +206,6 @@ jobs:
 
       - name: Record deployed tag
         run: |
-          echo $GITHUB_OUTPUT
-          cat $GITHUB_OUTPUT
-          pwd
-          ls -l `pwd`
-          tree
           if [ -z "$TAG" ]; then
             echo "TAG 变量为空"
           else 
