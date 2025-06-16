@@ -1,4 +1,6 @@
 name: auto-deploy sing-box via cloudflared
+permissions:
+  contents: write
 
 on:
   # schedule:
