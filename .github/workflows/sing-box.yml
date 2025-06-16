@@ -181,7 +181,8 @@ jobs:
             if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
               mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
               mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
-              [ -e /opt/sing-box/_upgrade ] || touch /opt/sing-box/_upgrade
+              # [ -e /opt/sing-box/_upgrade ] || touch /opt/sing-box/_upgrade
+              service sing-box restart
             else
               rm -rf /opt/sing-box/sing-box.new
               curl -s \
@@ -206,6 +207,7 @@ jobs:
       - name: Record deployed tag
         run: |
           echo $GITHUB_OUTPUT
+          cat `echo $GITHUB_OUTPUT`
           pwd
           ls -l `pwd`
           tree
