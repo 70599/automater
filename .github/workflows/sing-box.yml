@@ -170,11 +170,11 @@ jobs:
           cf_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
           cf_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      - name: scp binary
+      - name: transfer binary
         run: |
           RC=1 
           while [[ $RC -ne 0 ]]; do
-            scp ./deploy/sing-box vps:/opt/sing-box/sing-box.new
+            rsync -avz --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
             RC=$?
           done
 
@@ -201,9 +201,13 @@ jobs:
       - name: Record deployed tag
         if: success()
         run: |
-          echo "$TAG" > sing-box/last_deployed_tag
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add sing-box/last_deployed_tag
-          git commit -m "Record deployed tag $TAG"
-          git push
+          if [ -z "$TAG" ]; then
+            echo "TAG 变量为空"
+          else 
+            echo "$TAG" > sing-box/last_deployed_tag
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add sing-box/last_deployed_tag
+            git commit -m "Record deployed tag $TAG"
+            git push
+          fi
