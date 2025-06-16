@@ -4,7 +4,7 @@ name: auto-deploy sing-box via cloudflared
 
 on:
   schedule:
-    - cron: '0 */4 * * *'  # every 4 hours
+    - cron: '0 5 * * *'  # every 4 hours
   workflow_dispatch:
 
 jobs:
