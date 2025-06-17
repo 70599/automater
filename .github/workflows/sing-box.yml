@@ -10,7 +10,7 @@ on:
     inputs:
       filter:
         type: choice
-        description: 'Which type of release to deploy: "release" or "prerelease"'
+        description: 'Which type of release to deploy?'
         options:
           - prerelease
           - release
