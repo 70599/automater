@@ -9,9 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       filter:
+        type: choice
         description: 'Which type of release to deploy: "release" or "prerelease"'
-        required: false
-        default: prerelease
+        options:
+          - prerelease
+          - release
 
 jobs:
   poll:
