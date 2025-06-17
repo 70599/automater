@@ -1,42 +1,49 @@
 name: deploy sing-box via cloudflared
+
 # permissions:
 #   contents: write
 
 on:
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '0 5 * * *'    # 每天凌晨 05:00
   workflow_dispatch:
+    inputs:
+      filter:
+        description: 'Which type of release to deploy: "release" or "prerelease"'
+        required: false
+        default: prerelease
 
 jobs:
   poll:
-    name: Poll latest sing-box prerelease
+    name: Poll latest sing-box release
     runs-on: ubuntu-latest
+    env:
+      # 从 inputs 或 定时器上下文 取值，如果是 schedule 时没 inputs，就用默认 prerelease
+      FILTER: ${{ github.event.inputs.filter || 'prerelease' }}
     outputs:
       tag: ${{ steps.get.outputs.tag }}
-      prerelease: ${{ steps.get.outputs.pr }}
       should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Get latest prerelease info
+      - name: Get latest ${{ env.FILTER }} info
         id: get
         run: |
-          # 拉取所有 release，再挑出 prerelease
           info=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases)
-          tag=$(echo "$info" \
-            | jq -r '[.[] | select(.prerelease == true)][0].tag_name')
-          pr=$(echo "$info" \
-            | jq -r '[.[] | select(.prerelease == true)][0].prerelease')
+          if [ "$FILTER" = "prerelease" ]; then
+            tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==true)][0].tag_name')
+          else
+            tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==false)][0].tag_name')
+          fi
 
-          if [ -z "$tag" ] || [ "$pr" != "true" ]; then
-            echo "No prerelease found, or API error. Exiting."
+          if [ -z "$tag" ]; then
+            echo "No matching $FILTER found, exiting."
             exit 0
           fi
 
-          # 写输出
+          echo "Found tag: $tag"
           echo "tag=$tag" >> $GITHUB_OUTPUT
-          echo "pr=$pr"   >> $GITHUB_OUTPUT
 
       - name: Check last deployed tag
         id: check
@@ -44,8 +51,8 @@ jobs:
           DEPLOYED_FILE=sing-box/last_deployed_tag
           last=""
           [ -f "$DEPLOYED_FILE" ] && last=$(<"$DEPLOYED_FILE")
-
           echo "Last deployed: $last"
+
           if [ "$last" != "${{ steps.get.outputs.tag }}" ]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           else
