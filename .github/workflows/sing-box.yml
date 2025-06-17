@@ -1,4 +1,4 @@
-name: auto-deploy sing-box via cloudflared
+name: deploy sing-box via cloudflared
 # permissions:
 #   contents: write
 
