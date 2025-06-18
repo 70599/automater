@@ -33,7 +33,11 @@ jobs:
         id: get
         run: |
           info=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases)
-          tag=$(echo "$info" | jq -r '[.[] | select(."$FILTER"==true)][0].tag_name')
+          if [ "$FILTER" = "prerelease" ]; then
+            tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==true)][0].tag_name')
+          else
+            tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==false)][0].tag_name')
+          fi
 
           if [ -z "$tag" ]; then
             echo "No matching $FILTER found, exiting."
