@@ -33,11 +33,7 @@ jobs:
         id: get
         run: |
           info=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases)
-          if [ "$FILTER" = "prerelease" ]; then
-            tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==true)][0].tag_name')
-          else
-            tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==false)][0].tag_name')
-          fi
+          tag=$(echo "$info" | jq -r '[.[] | select(."$FILTER"==true)][0].tag_name')
 
           if [ -z "$tag" ]; then
             echo "No matching $FILTER found, exiting."
@@ -64,7 +60,7 @@ jobs:
   build:
     name: Build sing-box binaries
     needs: poll
-    if: needs.poll.outputs.prerelease == 'true' && needs.poll.outputs.should_deploy == 'true'
+    if: needs.poll.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -123,7 +119,7 @@ jobs:
 
   deploy:
     needs: [poll, build]
-    if: needs.poll.outputs.prerelease == 'true' && needs.poll.outputs.should_deploy == 'true'
+    if: needs.poll.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
