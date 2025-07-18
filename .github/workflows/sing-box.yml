@@ -181,7 +181,7 @@ jobs:
         run: |
           RC=1 
           while [[ $RC -ne 0 ]]; do
-            rsync -avz --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
+            rsync -avzP --delete ./deploy/sing-box vps:/opt/sing-box/sing-box.new
             RC=$?
           done
 
