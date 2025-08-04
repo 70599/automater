@@ -20,7 +20,7 @@ jobs:
     name: Poll latest sing-box release
     runs-on: ubuntu-latest
     env:
-      # 从 inputs 或 定时器上下文 取值，如果是 schedule 时没 inputs，就用默认 prerelease
+      # 从 inputs 或 定时器上下文 取值，如果是 schedule 时没 inputs，就用默认 release
       FILTER: ${{ github.event.inputs.filter || 'release' }}
     outputs:
       tag: ${{ steps.get.outputs.tag }}
