@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # 从 inputs 或 定时器上下文 取值，如果是 schedule 时没 inputs，就用默认 prerelease
-      FILTER: ${{ github.event.inputs.filter || 'prerelease' }}
+      FILTER: ${{ github.event.inputs.filter || 'release' }}
     outputs:
       tag: ${{ steps.get.outputs.tag }}
       should_deploy: ${{ steps.check.outputs.should_deploy }}
