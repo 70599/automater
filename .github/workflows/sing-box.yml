@@ -174,7 +174,7 @@ jobs:
             rsync -avzP --delete "./deploy/$artifact/sing-box" vps:/opt/sing-box/sing-box.new
 
             # 远程检查并替换
-            ssh vps bash -e "
+            ssh vps bash -c "
               [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
               if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
                 mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
