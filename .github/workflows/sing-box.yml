@@ -55,7 +55,6 @@ jobs:
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           else
             echo "should_deploy=false" >> $GITHUB_OUTPUT
-          fi
 
   build:
     name: Build sing-box binaries
@@ -134,11 +133,11 @@ jobs:
             -o /opt/bin/cloudflared
           chmod +x /opt/bin/cloudflared
 
-      - name: Prepare SSH base config
+      - name: Prepare SSH keys
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY }}"   > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
 
       - name: Deploy sequentially to all hosts
@@ -158,36 +157,33 @@ jobs:
 
             echo ">>> Deploying to $host with artifact $artifact"
 
-            # 动态写 SSH config
-cat <<EOF > ~/.ssh/config
-Host vps
-  HostName $host
-  User ${{ secrets.SSH_USER }}
-  ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id $CF_TOKEN_ID --service-token-secret $CF_TOKEN_SECRET
-EOF
+            echo "Host vps" > ~/.ssh/config
+            echo "  HostName $host" >> ~/.ssh/config
+            echo "  User ${{ secrets.SSH_USER }}" >> ~/.ssh/config
+            echo "  ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id $CF_TOKEN_ID --service-token-secret $CF_TOKEN_SECRET" >> ~/.ssh/config
             chmod 600 ~/.ssh/config
 
-            # 上传对应 artifact
+            # 上传 artifact
             rsync -avzP --delete "./deploy/$artifact/sing-box" vps:/opt/sing-box/sing-box.new
 
             # 远程检查并替换
-ssh vps bash -e <<'EOS'
-[ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
-if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
-  mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
-  mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
-  service sing-box restart
-else
-  rm -rf /opt/sing-box/sing-box.new
-  curl -s \
-    --form-string "token=$PUSHOVER_TOKEN" \
-    --form-string "user=$PUSHOVER_USER" \
-    --form-string "title=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
-    --form-string "html=1" \
-    --form-string "message=$(cat /proc/sys/kernel/hostname) 上的新版 sing-box 不兼容现有配置文件" \
-    https://api.pushover.net/1/messages.json
-fi
-EOS
+            ssh vps bash -e "
+              [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
+              if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
+                mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
+                mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+                service sing-box restart
+              else
+                rm -rf /opt/sing-box/sing-box.new
+                curl -s \
+                  --form-string \"token=$PUSHOVER_TOKEN\" \
+                  --form-string \"user=$PUSHOVER_USER\" \
+                  --form-string \"title=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
+                  --form-string \"html=1\" \
+                  --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
+                  https://api.pushover.net/1/messages.json
+              fi
+            "
 
             echo ">>> Completed $host"
           done
@@ -203,9 +199,7 @@ EOS
 
       - name: Record deployed tag
         run: |
-          if [ -z "$TAG" ]; then
-            echo "TAG 变量为空"
-          else 
+          if [ -n "$TAG" ]; then
             echo "$TAG" > sing-box/last_deployed_tag
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
