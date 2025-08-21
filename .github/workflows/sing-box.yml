@@ -176,7 +176,7 @@ jobs:
             # 远程检查并替换
             ssh vps bash -c "
               [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
-              if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json; then
+              if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json
                 mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
                 mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
                 service sing-box restart
@@ -189,7 +189,7 @@ jobs:
                   --form-string \"html=1\" \
                   --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
                   https://api.pushover.net/1/messages.json
-              fi
+              end
             "
 
             echo ">>> Completed $host"
