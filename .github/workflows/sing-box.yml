@@ -55,6 +55,7 @@ jobs:
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           else
             echo "should_deploy=false" >> $GITHUB_OUTPUT
+          fi
 
   build:
     name: Build sing-box binaries
