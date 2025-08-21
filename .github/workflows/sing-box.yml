@@ -130,21 +130,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./deploy
-  
+
       - name: Install cloudflared
         run: |
           mkdir -p /opt/bin
           curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
             -o /opt/bin/cloudflared
           chmod +x /opt/bin/cloudflared
-  
+
       - name: Prepare SSH config
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           echo "${{ secrets.SSH_PRIVATE_KEY }}"   > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-  
+
       - name: Deploy to all hosts sequentially
         env:
           CF_TOKEN_ID: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
