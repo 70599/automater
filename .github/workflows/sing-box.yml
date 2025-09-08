@@ -17,7 +17,7 @@ jobs:
     name: Poll latest sing-box release
     runs-on: ubuntu-latest
     env:
-      FILTER: ${{ github.event.inputs.filter || 'release' }}
+      FILTER: ${{ github.event.inputs.filter || 'prerelease' }}
     outputs:
       tag: ${{ steps.get.outputs.tag }}
       should_deploy: ${{ steps.check.outputs.should_deploy }}
