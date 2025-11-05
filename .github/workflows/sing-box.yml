@@ -155,8 +155,8 @@ jobs:
           PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
         run: |
           set -e
-          hosts=("${{ secrets.SSH_HOST_0 }}" "${{ secrets.SSH_HOST_1 }}" "${{ secrets.SSH_HOST_2 }}" "${{ secrets.SSH_HOST_3 }}" "${{ secrets.SSH_HOST_4 }}")
-          artifacts=("sing-box-linux-arm64" "sing-box-linux-amd64" "sing-box-linux-amd64-v3" "sing-box-linux-amd64" "sing-box-linux-amd64-v3")
+          hosts=("${{ secrets.SSH_HOST_0 }}" "${{ secrets.SSH_HOST_1 }}" "${{ secrets.SSH_HOST_2 }}" "${{ secrets.SSH_HOST_3 }}" "${{ secrets.SSH_HOST_4 }}" "${{ secrets.SSH_HOST_5 }}")
+          artifacts=("sing-box-linux-arm64" "sing-box-linux-amd64" "sing-box-linux-amd64-v3" "sing-box-linux-amd64" "sing-box-linux-amd64-v3" "sing-box-linux-amd64-v3")
 
           for i in "${!hosts[@]}"; do
             host="${hosts[$i]}"
