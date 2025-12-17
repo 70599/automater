@@ -81,7 +81,7 @@ jobs:
             goos: linux
             goarch: arm64
             artifact: sing-box-linux-arm64
-            tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api,with_purego,with_naive_outbound
+            tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api,with_musl,with_naive_outbound
     steps:
       - name: Checkout sing-box @ ${{ needs.poll.outputs.tag }}
         uses: actions/checkout@v4
