@@ -70,15 +70,18 @@ jobs:
             goarch: amd64
             goamd64: v1
             artifact: sing-box-linux-amd64
+            tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api
           - name: linux-amd64-v3
             goos: linux
             goarch: amd64
             goamd64: v3
             artifact: sing-box-linux-amd64-v3
+            tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api
           - name: linux-arm64
             goos: linux
             goarch: arm64
             artifact: sing-box-linux-arm64
+            tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api,with_purego,with_naive_outbound
     steps:
       - name: Checkout sing-box @ ${{ needs.poll.outputs.tag }}
         uses: actions/checkout@v4
@@ -105,7 +108,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           GOAMD64: ${{ matrix.goamd64 }}
           CGO_ENABLED: 0
-          TAGS: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api,with_naive_outbound
+          TAGS: ${{ matrix.tags }}
         run: make
 
       - name: Compress ${{ matrix.name }}
