@@ -109,7 +109,7 @@ jobs:
         if: matrix.goarch == 'arm64' && matrix.cgo == 1
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y musl-tools gcc-aarch64-linux-musl
 
       - name: Build ${{ matrix.name }}
         env:
@@ -118,7 +118,7 @@ jobs:
           GOAMD64: ${{ matrix.goamd64 }}
           CGO_ENABLED: ${{ matrix.cgo }}
           TAGS: ${{ matrix.tags }}
-          CC: ${{ matrix.goarch == 'arm64' && matrix.cgo == 1 && 'aarch64-linux-gnu-gcc' || '' }}
+          CC: ${{ matrix.goarch == 'arm64' && matrix.cgo == 1 && 'aarch64-linux-musl-gcc' || '' }}
         run: make
 
       - name: Compress ${{ matrix.name }}
