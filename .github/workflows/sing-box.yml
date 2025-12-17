@@ -108,8 +108,13 @@ jobs:
       - name: Install arm64 toolchain
         if: matrix.goarch == 'arm64' && matrix.cgo == 1
         run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools gcc-aarch64-linux-musl
+          TOOLCHAIN=aarch64-linux-musl
+          VERSION=1.2.4
+      
+          curl -L https://musl.cc/${TOOLCHAIN}-cross.tgz -o /tmp/${TOOLCHAIN}.tgz
+          tar -xzf /tmp/${TOOLCHAIN}.tgz -C /opt
+      
+          echo "/opt/${TOOLCHAIN}-cross/bin" >> $GITHUB_PATH
 
       - name: Build ${{ matrix.name }}
         env:
