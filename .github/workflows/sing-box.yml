@@ -1,8 +1,6 @@
 name: deploy sing-box via cloudflared
 
 on:
-  # schedule:
-  #   - cron: '0 21 * * *'    # 每天凌晨 05:00
   workflow_dispatch:
     inputs:
       filter:
@@ -34,13 +32,7 @@ jobs:
           else
             tag=$(echo "$info" | jq -r '[.[] | select(.prerelease==false)][0].tag_name')
           fi
-
-          if [ -z "$tag" ]; then
-            echo "No matching $FILTER found, exiting."
-            exit 0
-          fi
-
-          echo "Found tag: $tag"
+          [ -z "$tag" ] && exit 0
           echo "tag=$tag" >> $GITHUB_OUTPUT
 
       - name: Check last deployed tag
@@ -49,8 +41,6 @@ jobs:
           DEPLOYED_FILE=sing-box/last_deployed_tag
           last=""
           [ -f "$DEPLOYED_FILE" ] && last=$(<"$DEPLOYED_FILE")
-          echo "Last deployed: $last"
-
           if [ "$last" != "${{ steps.get.outputs.tag }}" ]; then
             echo "should_deploy=true" >> $GITHUB_OUTPUT
           else
@@ -72,6 +62,7 @@ jobs:
             cgo: 0
             artifact: sing-box-linux-amd64
             tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api
+
           - name: linux-amd64-v3
             goos: linux
             goarch: amd64
@@ -79,12 +70,14 @@ jobs:
             cgo: 0
             artifact: sing-box-linux-amd64-v3
             tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api
+
           - name: linux-arm64
             goos: linux
             goarch: arm64
             cgo: 1
             artifact: sing-box-linux-arm64
             tags: with_quic,with_gvisor,with_wireguard,with_utls,with_clash_api,with_naive_outbound,with_musl
+
     steps:
       - name: Checkout sing-box @ ${{ needs.poll.outputs.tag }}
         uses: actions/checkout@v4
@@ -105,16 +98,33 @@ jobs:
         with:
           go-version: ${{ steps.version.outputs.go_version }}
 
-      - name: Install arm64 toolchain
+      # ======== ① Clone cronet-go（仅 arm64 + cgo）========
+      - name: Clone cronet-go
         if: matrix.goarch == 'arm64' && matrix.cgo == 1
         run: |
-          TOOLCHAIN=aarch64-linux-musl
-          VERSION=1.2.4
-      
-          curl -L https://musl.cc/${TOOLCHAIN}-cross.tgz -o /tmp/${TOOLCHAIN}.tgz
-          tar -xzf /tmp/${TOOLCHAIN}.tgz -C /opt
-      
-          echo "/opt/${TOOLCHAIN}-cross/bin" >> $GITHUB_PATH
+          git clone https://github.com/SagerNet/cronet-go.git ~/cronet-go
+          cd ~/cronet-go
+          git submodule update --init --recursive
+
+      # ======== ② 下载 Chromium musl 工具链 ========
+      - name: Download Chromium musl toolchain (arm64)
+        if: matrix.goarch == 'arm64' && matrix.cgo == 1
+        run: |
+          cd ~/cronet-go
+          go run ./cmd/build-naive \
+            --target=linux/arm64 \
+            --libc=musl \
+            download-toolchain
+
+      # ======== ③ 注入交叉编译环境变量 ========
+      - name: Export Chromium toolchain env
+        if: matrix.goarch == 'arm64' && matrix.cgo == 1
+        run: |
+          cd ~/cronet-go
+          go run ./cmd/build-naive \
+            --target=linux/arm64 \
+            --libc=musl \
+            env >> $GITHUB_ENV
 
       - name: Build ${{ matrix.name }}
         env:
@@ -123,7 +133,6 @@ jobs:
           GOAMD64: ${{ matrix.goamd64 }}
           CGO_ENABLED: ${{ matrix.cgo }}
           TAGS: ${{ matrix.tags }}
-          CC: ${{ matrix.goarch == 'arm64' && matrix.cgo == 1 && 'aarch64-linux-musl-gcc' || '' }}
         run: make
 
       - name: Compress ${{ matrix.name }}
@@ -134,101 +143,3 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: sing-box
-
-  deploy:
-    needs: [poll, build]
-    if: needs.poll.outputs.should_deploy == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./deploy
-
-      - name: Install cloudflared
-        run: |
-          mkdir -p /opt/bin
-          curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
-            -o /opt/bin/cloudflared
-          chmod +x /opt/bin/cloudflared
-
-      - name: Prepare SSH keys
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-
-      - name: Bypass Cloudflare for GitHub Action
-        uses: xiaotianxt/bypass-cloudflare-for-github-action@v1.1.1
-        with:
-          cf_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          cf_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Deploy sequentially to all hosts
-        env:
-          CF_TOKEN_ID: ${{ secrets.CLOUDFLARED_TOKEN_ID }}
-          CF_TOKEN_SECRET: ${{ secrets.CLOUDFLARED_TOKEN_SECRET }}
-          PUSHOVER_TOKEN: ${{ secrets.PUSHOVER_APP_AU }}
-          PUSHOVER_USER: ${{ secrets.PUSHOVER_USER }}
-        run: |
-          set -e
-          hosts=("${{ secrets.SSH_HOST_0 }}" "${{ secrets.SSH_HOST_1 }}" "${{ secrets.SSH_HOST_2 }}" "${{ secrets.SSH_HOST_4 }}" "${{ secrets.SSH_HOST_5 }}")
-          artifacts=("sing-box-linux-arm64" "sing-box-linux-amd64" "sing-box-linux-amd64-v3" "sing-box-linux-amd64" "sing-box-linux-amd64-v3" "sing-box-linux-amd64-v3")
-
-          for i in "${!hosts[@]}"; do
-            host="${hosts[$i]}"
-            artifact="${artifacts[$i]}"
-
-            echo ">>> Deploying to $host with artifact $artifact"
-
-            echo "Host vps" > ~/.ssh/config
-            echo "  HostName $host" >> ~/.ssh/config
-            echo "  User ${{ secrets.SSH_USER }}" >> ~/.ssh/config
-            echo "  ProxyCommand /opt/bin/cloudflared access ssh --hostname %h --service-token-id $CF_TOKEN_ID --service-token-secret $CF_TOKEN_SECRET" >> ~/.ssh/config
-            chmod 600 ~/.ssh/config
-
-            # 上传 artifact
-            rsync -avzP --delete "./deploy/$artifact/sing-box" vps:/opt/sing-box/sing-box.new
-
-            # 远程检查并替换
-            ssh vps bash -c "
-              [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
-              if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json
-                mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
-                mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
-                service sing-box restart
-              else
-                rm -rf /opt/sing-box/sing-box.new
-                curl -s \
-                  --form-string \"token=$PUSHOVER_TOKEN\" \
-                  --form-string \"user=$PUSHOVER_USER\" \
-                  --form-string \"title=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
-                  --form-string \"html=1\" \
-                  --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
-                  https://api.pushover.net/1/messages.json
-              end
-            "
-
-            echo ">>> Completed $host"
-          done
-
-  record:
-    needs: [poll, deploy]
-    runs-on: ubuntu-latest
-    env:
-      TAG: ${{ needs.poll.outputs.tag }}
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Record deployed tag
-        run: |
-          if [ -n "$TAG" ]; then
-            echo "$TAG" > sing-box/last_deployed_tag
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add sing-box/last_deployed_tag
-            git commit -m "Record deployed tag $TAG"
-            git push
-          fi
