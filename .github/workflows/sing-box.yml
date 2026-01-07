@@ -1,8 +1,8 @@
 name: deploy sing-box via cloudflared
 
 on:
-  # schedule:
-  #   - cron: '0 21 * * *'    # 每天凌晨 05:00
+  schedule:
+    - cron: '0 21 * * *'    # 每天凌晨 05:00
   workflow_dispatch:
     inputs:
       filter:
