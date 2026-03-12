@@ -23,7 +23,7 @@ jobs:
       should_deploy: ${{ steps.check.outputs.should_deploy }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get latest ${{ env.FILTER }} info
         id: get
@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Checkout sing-box @ ${{ needs.poll.outputs.tag }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: SagerNet/sing-box
           ref: ${{ needs.poll.outputs.tag }}
@@ -231,7 +231,7 @@ jobs:
       TAG: ${{ needs.poll.outputs.tag }}
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Record deployed tag
         run: |
