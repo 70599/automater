@@ -203,8 +203,8 @@ jobs:
                   --form-string \"html=1\" \
                   --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
                   https://api.pushover.net/1/messages.json
-              fi
-            }
+              }
+            "
 
             echo -e ">>> Completed host-$i\n"
           done
