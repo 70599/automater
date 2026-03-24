@@ -194,15 +194,13 @@ jobs:
 
             # 远程更新
             ssh vps bash -c "
-              pgrep sing-box >/dev/null && ! service sing-box upgrade && {
-                curl -s \
-                  --form-string \"token=$PUSHOVER_TOKEN\" \
-                  --form-string \"user=$PUSHOVER_USER\" \
-                  --form-string \"title=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
-                  --form-string \"html=1\" \
-                  --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
-                  https://api.pushover.net/1/messages.json
-              }
+              pgrep sing-box >/dev/null && ! service sing-box upgrade && curl -s \
+              --form-string \"token=$PUSHOVER_TOKEN\" \
+              --form-string \"user=$PUSHOVER_USER\" \
+              --form-string \"title=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
+              --form-string \"html=1\" \
+              --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
+              https://api.pushover.net/1/messages.json
             "
 
             echo -e ">>> Completed host-$i\n"
