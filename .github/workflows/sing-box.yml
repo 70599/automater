@@ -96,7 +96,7 @@ jobs:
             | head -1 | cut -d':' -f2 | tr -d ' "') >> $GITHUB_OUTPUT
 
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ steps.version.outputs.go_version }}
 
@@ -141,7 +141,7 @@ jobs:
         run: upx sing-box
 
       - name: Upload ${{ matrix.name }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}
           path: sing-box
