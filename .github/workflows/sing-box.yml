@@ -194,8 +194,7 @@ jobs:
 
             # 远程更新
             ssh vps bash -c "
-              pgrep sing-box && service sing-box restart
-              if ! service sing-box upgrade; then
+              pgrep sing-box >/dev/null && ! service sing-box upgrade && {
                 curl -s \
                   --form-string \"token=$PUSHOVER_TOKEN\" \
                   --form-string \"user=$PUSHOVER_USER\" \
@@ -204,7 +203,7 @@ jobs:
                   --form-string \"message=$(hostname) 上的新版 sing-box 不兼容现有配置文件\" \
                   https://api.pushover.net/1/messages.json
               fi
-            "
+            }
 
             echo -e ">>> Completed host-$i\n"
           done
