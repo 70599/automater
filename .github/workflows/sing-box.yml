@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: ./deploy
 
@@ -171,11 +171,10 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
 
       - name: Bypass Cloudflare for GitHub Action
-        uses: xiaotianxt/bypass-cloudflare-for-github-action@v2.1.0
+        uses: xiaotianxt/bypass-cloudflare-for-github-action@v1.1.1
         with:
-          cf_account_id: ${{ secrets.CLOUDFLARED_ACCOUNT_ID }}
           cf_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          cf_api_token: ${{ secrets.CF_API_TOKEN }}
+          cf_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Deploy sequentially to all hosts
         env:
