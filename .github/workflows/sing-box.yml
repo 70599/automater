@@ -210,7 +210,8 @@ jobs:
                 mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
                 mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
                 echo 'restarting sing-box ...'
-                pgrep sing-box && service sing-box restart
+                pgrep sing-box || exit 0
+                service sing-box restart
               else
                 rm -rf /opt/sing-box/sing-box.new
                 curl -s \
