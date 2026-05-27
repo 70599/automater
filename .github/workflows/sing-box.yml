@@ -206,8 +206,10 @@ jobs:
             ssh vps bash -c "
               [ -x /opt/sing-box/sing-box.new ] || chmod +x /opt/sing-box/sing-box.new
               if /opt/sing-box/sing-box.new check -c /opt/sing-box/config.json
+                echo 'config OK!'
                 mv -f /opt/sing-box/sing-box /opt/sing-box/sing-box.bkup
                 mv -f /opt/sing-box/sing-box.new /opt/sing-box/sing-box
+                echo 'restarting sing-box ...'
                 pgrep sing-box && service sing-box restart
               else
                 rm -rf /opt/sing-box/sing-box.new
